@@ -6,6 +6,8 @@ license = "MIT/Apache-2.0"
 repository = "https://github.com/invenia/std-semaphore"
 homepage = "https://github.com/invenia/std-semaphore"
 documentation = "https://invenia.github.io/std-semaphore"
+readme = "README.md"
+keywords = ["sync"]
 description = """
 A counting, blocking sempahore extracted from rust 1.7.0.
 """
