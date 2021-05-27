@@ -69,10 +69,19 @@ impl Semaphore {
     /// least 1.
     pub fn acquire(&self) {
         let mut count = self.lock.lock().unwrap();
-        while *count <= 0 {
-            count = self.cvar.wait(count).unwrap();
+        count = self.cvar.wait_while(count, |c| *c <= 0).unwrap();
+        *count -= 1;
+    }
+
+    /// This works like `acquire`, but instead of blocking, return false if
+    /// the resource could not be acquired, otherwise return true
+    pub fn try_acquire(&self) -> bool {
+        let mut count = self.lock.lock().unwrap();
+        if *count <= 0 {
+            return false;
         }
         *count -= 1;
+        return true;
     }
 
     /// Release a resource from this semaphore.
@@ -93,6 +102,15 @@ impl Semaphore {
         self.acquire();
         SemaphoreGuard { sem: self }
     }
+
+    /// This works like `access`, but instead of blocking, return `None` if
+    /// the resource could not be acquired, otherwise, return the `SemaphoreGuard`
+    pub fn try_access(&self) -> Option<SemaphoreGuard> {
+        if self.try_acquire() {
+            return Some(SemaphoreGuard { sem: self });
+        }
+        return None;
+    }
 }
 
 impl<'a> Drop for SemaphoreGuard<'a> {
@@ -105,9 +123,9 @@ impl<'a> Drop for SemaphoreGuard<'a> {
 mod tests {
     use std::prelude::v1::*;
 
-    use std::sync::Arc;
     use super::Semaphore;
     use std::sync::mpsc::channel;
+    use std::sync::Arc;
     use std::thread;
 
     #[test]
@@ -132,6 +150,25 @@ mod tests {
             let _g = s2.access();
         });
         let _g = s.access();
+    }
+
+    #[test]
+    fn test_sem_try_acquire() {
+        let s = Semaphore::new(1);
+        s.acquire();
+        assert!(s.try_acquire() == false);
+        s.release();
+        assert!(s.try_acquire() == true);
+    }
+
+    #[test]
+    fn test_sem_try_access() {
+        let s = Semaphore::new(1);
+        {
+            let _g = s.access();
+            assert!(s.try_access().is_none());
+        }
+        assert!(s.try_access().is_some());
     }
 
     #[test]
